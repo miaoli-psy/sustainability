@@ -9,7 +9,7 @@ This repository contains the data and analysis code for the [Sustainability Proj
 ## Files and Directories
 - `data/`: TBC
 - `src/`: Source code for analysis.
-    -`Bardley_Terry`: 
+    - `Bardley_Terry/`: 
 
 ## Licensing
 This repository is released under the BSD 2-Clause License.
