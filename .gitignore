@@ -5,6 +5,7 @@
 *.svg
 *.pyc
 *.csv
+*.xlsx
 
 # User-specific stuff
 .idea/**/workspace.xml
