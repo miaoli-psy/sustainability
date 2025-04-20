@@ -16,3 +16,32 @@ def insert_new_col(input_df: pd.DataFrame, old_col: str, new_col: str, func_name
         input_df.insert(col_index, new_col, input_df[old_col].map(func_name))
     else:
         raise Exception(f"Warning: missing {old_col}")
+
+
+def get_resp(choice_psychopy, n):
+    if n < 0.5:
+        if choice_psychopy == "left":
+            resp = "A"
+        else:
+            resp = "B"
+    else:
+        if choice_psychopy == "left":
+            resp = "B"
+        else:
+            resp = "A"
+    return resp
+
+
+def get_correct_ans(impactA, impactB):
+    if impactA > impactB:
+        currect_ans = "A"
+    else:
+        currect_ans = "B"
+    return currect_ans
+
+
+def get_correct_wrong_index(correctAns, reprotedAns):
+    if correctAns == reprotedAns:
+        return 1
+    else:
+        return 0

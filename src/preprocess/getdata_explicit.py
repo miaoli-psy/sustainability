@@ -44,3 +44,7 @@ for data in df_list_all:
 
 # Combine all processed data into one DataFrame
 output_data = pd.concat(all_processed_data, ignore_index=True)
+
+write_to_excel = False
+if write_to_excel:
+    output_data.to_excel("ie_explicitdata.xlsx", index = False)
