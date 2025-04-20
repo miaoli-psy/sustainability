@@ -5,32 +5,42 @@ import pandas as pd
 PATH_DATA = "../../data/ie_data/"
 dir_list = os.listdir(PATH_DATA)
 # all data files
+dir_list = [f for f in os.listdir(PATH_DATA) if f.lower().endswith('.csv')]
+
 df_list_all = [pd.read_csv(PATH_DATA + file) for file in dir_list]
 
 # get all col names
 col_names = df_list_all[0].columns.tolist()
 
 # sliders
-col_explicit = [col for col in col_names if col.startswith("slider")]
-col_explicit = col_explicit + ["expli_order", "nor1_order", "nor2_order", "nor3_order", "participant", "expName"]
-
-
-# try process one file
-
-data = df_list_all[0]
-
+# create lists for response and RT columns
 slider_responses = [f'slider_posi_{i}.response' for i in range(1, 11)]
 slider_times = [f'slider_posi_{i}.rt' for i in range(1, 11)]
-relevant_columns = slider_responses + slider_times + ['participant', 'expli_order']
 
-filtered_data = data[relevant_columns]
+col_explicit = slider_responses + slider_times + ["expli_order", "nor1_order", "nor2_order", "nor3_order", "participant", "expName"]
 
-valid_row = filtered_data.dropna(subset=[f'slider_posi_{i}.response' for i in range(1, 11)]).iloc[0]
+# Initialize an empty list to store all processed data
+all_processed_data = []
 
-actions = valid_row['expli_order'] if isinstance(valid_row['expli_order'], list) else eval(valid_row['expli_order'])
+# Process each dataframe
+for data in df_list_all:
+    filtered_data = data[col_explicit]
+    # Process each valid row (rows with complete slider responses)
+    valid_rows = filtered_data.dropna(subset=[f'slider_posi_{i}.response' for i in range(1, 11)])
 
-output_data = pd.DataFrame({
-    'impact': [valid_row[f'slider_posi_{i}.response'] for i in range(1, 11)],  # Slider response values
-    'action': actions[:10],
-    'RT': [valid_row[f'slider_posi_{i}.rt'] for i in range(1, 11)]  # Slider RT values
-})
+    for _, row in valid_rows.iterrows():
+        actions = row['expli_order'] if isinstance(row['expli_order'], list) else eval(
+            row['expli_order'])
+
+        # Create DataFrame for this row
+        row_data = pd.DataFrame({
+            'impact': [row[f'slider_posi_{i}.response'] for i in range(1, 11)],
+            'action': actions[:10],
+            'RT': [row[f'slider_posi_{i}.rt'] for i in range(1, 11)],
+            'participant': [row['participant']] * 10
+        })
+
+        all_processed_data.append(row_data)
+
+# Combine all processed data into one DataFrame
+output_data = pd.concat(all_processed_data, ignore_index=True)
