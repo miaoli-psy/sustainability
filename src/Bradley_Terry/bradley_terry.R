@@ -4,7 +4,7 @@ library(BradleyTerry2)
 
 
 # set working path
-setwd("D:/OneDrive/projects/Norway_project/src/Bradley_Terry/")
+setwd("D:/OneDrive/projects/sustainability/src/Bradley_Terry/")
 
 data <- read.csv(file.choose()) #simu_res_1p.csv
 
