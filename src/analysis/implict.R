@@ -1,18 +1,21 @@
 library(readxl)
 library(dplyr)
+
 library(ggplot2)
+
+library(BradleyTerry2)
 
 setwd("D:/OneDrive/projects/sustainability/src/analysis/")
 
 data <- readxl::read_excel(file.choose()) #ie_implicitdata.xlsx
 
-#---------calculate percent correct (non-weighted)--------------
 # extract action names from image paths
 data <- data %>%
   mutate(
     actionA = gsub(".png", "", basename(imageA)),
     actionB = gsub(".png", "", basename(imageB))
   )
+#---------calculate percent correct (non-weighted)--------------
 
 # list actions
 actions <- unique(data$actionA)
@@ -98,7 +101,7 @@ plot_percent_correct <- ggplot() +
             aes(x = action, y = mean_percent_correct, label = round(mean_percent_correct, 2)),
             vjust = -0.5, size = 4, fontface = "bold") +
   
-  labs(y = "Percent Correct", x = "Action") +
+  labs(y = "Percent Correct (%)", x = "Action") +
   
   scale_x_discrete(labels = c(
     "green_energy" = "Green energy",
@@ -135,3 +138,155 @@ plot_percent_correct <- ggplot() +
   
   
 plot_percent_correct
+
+#---------Bradley-Terry model, for all data set, effect of the trial/task difficulty------
+
+# add col chosen
+data <- data %>% 
+  mutate(
+    chosen = ifelse(resp == "A", actionA, actionB)
+  )
+
+# compute difficulty: log of absolute difference in impact
+# negative, very difficult (real impact scores between A and B are close)
+# positive, low difficulty (real impact scores between A and B differ)
+
+data <- data %>% 
+  mutate(
+    difficulty = log(abs(impactA - impactB) + 1e-6) # avoid -inf
+  )
+
+
+# get col names for BTm
+data <- data %>% 
+  rename(item1 = actionA,
+         item2 = actionB)
+
+
+bt_data <- data %>% 
+  group_by(participant, item1, item2) %>% 
+  summarise(
+    wins1 = sum(chosen == item1),
+    wins2 = sum(chosen == item2),
+    n = n(),
+    difficulty = mean(difficulty),
+    .groups = "drop"
+  )
+
+# Ensure item1 and item2 are factors with the same levels
+all_levels <- union(levels(factor(bt_data$item1)), levels(factor(bt_data$item2)))
+bt_data$item1 <- factor(bt_data$item1, levels = all_levels)
+bt_data$item2 <- factor(bt_data$item2, levels = all_levels)
+
+# Create player1 and player2 as data frames with the 'difficulty' attached to item1 only
+player1_df <- data.frame(items = bt_data$item1, difficulty = bt_data$difficulty)
+player2_df <- data.frame(items = bt_data$item2, difficulty = 0)  # zero out to create a contrast
+
+# Fit the model
+bt_model <- BTm(
+  outcome = cbind(bt_data$wins1, bt_data$wins2),
+  player1 = player1_df,
+  player2 = player2_df,
+  formula = ~ difficulty,
+  id = "items"
+)
+
+# As the difficulty increases (i.e., when the difference between the real impact scores of the two items gets larger), 
+# participants are more likely to correctly choose the item with the higher real impact.
+# larger difference → easier judgment → more accurate choice.
+summary(bt_model) 
+
+
+#---------Bradley-Terry model, each participant - effect of the trial/task difficulty----
+
+participant_ids <- unique(bt_data$participant)
+
+# Create a results container
+
+# positive beta → participants tend to use real impact
+results <- data.frame(
+  participant = character(),
+  beta_difficulty = numeric(),
+  se = numeric(),
+  p = numeric()
+)
+
+for (pid in participant_ids) {
+  
+  data_sub <- bt_data %>% filter(participant == pid)
+  
+  # Create item factor levels
+  all_levels <- union(levels(factor(data_sub$item1)), levels(factor(data_sub$item2)))
+  data_sub$item1 <- factor(data_sub$item1, levels = all_levels)
+  data_sub$item2 <- factor(data_sub$item2, levels = all_levels)
+  
+  # Set up player1/player2 with asymmetric difficulty
+  player1_df <- data.frame(items = data_sub$item1, difficulty = data_sub$difficulty)
+  player2_df <- data.frame(items = data_sub$item2, difficulty = 0)
+  
+  # Try fitting the model, catch errors
+  try({
+    bt_model <- BTm(
+      outcome = cbind(data_sub$wins1, data_sub$wins2),
+      player1 = player1_df,
+      player2 = player2_df,
+      formula = ~ difficulty,
+      id = "items"
+    )
+    
+    summary_bt <- summary(bt_model)
+    beta <- summary_bt$coefficients["difficulty", "Estimate"]
+    se <- summary_bt$coefficients["difficulty", "Std. Error"]
+    p <- summary_bt$coefficients["difficulty", "Pr(>|z|)"]
+    
+    results <- rbind(results, data.frame(
+      participant = pid,
+      beta_difficulty = beta,
+      se = se,
+      p = p
+    ))
+  }, silent = TRUE)
+}
+
+#-------classic BT model over entire dataset - estimate the ability(strength) of each item---
+# Ensure item1 and item2 are factors with the same levels
+all_levels <- union(levels(factor(bt_data$item1)), levels(factor(bt_data$item2)))
+bt_data$item1 <- factor(bt_data$item1, levels = all_levels)
+bt_data$item2 <- factor(bt_data$item2, levels = all_levels)
+
+bt_model <- BTm(
+  outcome = cbind(bt_data$wins1, bt_data$wins2),
+  player1 = bt_data$item1,
+  player2 = bt_data$item2,
+  id = "items"
+)
+
+summary(bt_model)
+
+# Extract item ability estimates
+coefs <- coef(bt_model)
+
+# coefficients and convert to odds
+odds <- exp(coef(bt_model))
+odds
+
+# to probabilities
+probabilities <- odds / (1 + odds)
+probabilities
+
+scores <- probabilities * 100
+scores['car'] <- 50
+
+scores
+
+# rank scores, higher to lower 10 to 1 (if reverse, use -scores)
+# Using a Bradley-Terry model, we derived a rank order of actions based on the 
+# frequency with which each was chosen as more impactful. 
+# This reflects participants' implicit beliefs about climate action efficacy. 
+# The results show a divergence from actual impact rankings, 
+# suggesting systematic over- and underestimation of certain behaviors
+bt_ranks <- rank(scores) 
+bt_ranks
+
+
+

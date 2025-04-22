@@ -2,9 +2,11 @@
 
 library(BradleyTerry2)
 
-
 # set working path
 setwd("D:/OneDrive/projects/sustainability/src/Bradley_Terry/")
+
+
+data <- read.csv(file.choose()) #
 
 data <- read.csv(file.choose()) #simu_res_1p.csv
 
