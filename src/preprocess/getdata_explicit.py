@@ -2,7 +2,7 @@ import os
 import pandas as pd
 
 # Toggle: include or exclude "images/child.png"
-include_child = True
+include_child = False
 
 # working path
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -33,8 +33,16 @@ real_impact_dict = {
     "images/light_bulb.png": 0.1}
 
 # normalize real impact scores
-max_real_impact = max(real_impact_dict.values())
-normalized_real_impact_dict = {k: v / max_real_impact for k, v in real_impact_dict.items()}
+
+if include_child:
+    filtered_real_impact_dict = real_impact_dict.copy()
+else:
+    filtered_real_impact_dict = {k: v for k, v in real_impact_dict.items() if k != "images/child.png"}
+
+# normalize real impacts based on filtered actions only
+max_real_impact = max(filtered_real_impact_dict.values())
+normalized_real_impact_dict = {k: v / max_real_impact for k, v in filtered_real_impact_dict.items()}
+
 
 all_processed_data = []
 
@@ -50,12 +58,17 @@ for data in df_list_all:
         full_data = [
             (action, row[f'slider_posi_{i}.response'], row[f'slider_posi_{i}.rt'])
             for i, action in enumerate(actions[:10], start=1)
-            if include_child or action != "images/child.png"  # ✅ conditionally exclude
+            if include_child or action != "images/child.png" 
         ]
+
+        # apply filtering if include_child is False
+        if not include_child:
+            full_data = [tup for tup in full_data if tup[0] != "images/child.png"]
 
         # skip if empty after filtering
         if not full_data:
             continue
+
 
         # unpack
         actions_filtered, responses_filtered, rts_filtered = zip(*full_data)
@@ -66,7 +79,9 @@ for data in df_list_all:
 
         # real impact  (raw and normalized)
         real_impacts = [real_impact_dict.get(a) for a in actions_filtered]
+
         normalized_real_impacts = [normalized_real_impact_dict.get(a) for a in actions_filtered]
+
 
         # weighted scores
         weighted_scores = [m - r for m, r in zip(normalized_measured, normalized_real_impacts)]
@@ -74,13 +89,13 @@ for data in df_list_all:
         # ranks and deviations
         measured_ranks = pd.Series(normalized_measured).rank(ascending=False, method='min').tolist()
         real_ranks = pd.Series(normalized_real_impacts).rank(ascending=False, method='min').tolist()
-        deviations = [abs(m - r) for m, r in zip(measured_ranks, real_ranks)]
+        deviations = [(m - r) for m, r in zip(normalized_measured, normalized_real_impacts)]
 
 
         row_data = pd.DataFrame({
             'participant': [row['participant']] * len(actions_filtered),
             'action': actions_filtered,
-            'impact': responses_filtered,
+            'resp_impact': responses_filtered,
             'RT': rts_filtered,
             'normalized_measured': normalized_measured,
             'real_impact': real_impacts,
