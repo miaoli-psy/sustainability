@@ -21,16 +21,18 @@ col_explicit = slider_responses + slider_times + [
 
 # real impact scores
 real_impact_dict = {
-    "images/child.png": 58.6,
-    "images/car.png": 2.4,
-    "images/flight.png": 1.6,
-    "images/plant_based.png": 0.8,
-    "images/e_car.png": 1.15,
-    "images/green_energy.png": 2.63,
-    "images/laundry.png": 0.247,
-    "images/recycling.png": 0.5,
-    "images/hang_dry.png": 0.21,
-    "images/light_bulb.png": 0.1}
+    'images/laundry.png': 0.247,
+    'images/hang_dry.png': 0.21,
+    'images/child.png': 117.7,
+    'images/plant_based.png': 0.91,
+    'images/light_bulb.png': 0.17,
+    'images/green_energy.png': 1.4,
+    'images/flight.png': 1.6,
+    'images/car.png': 3.08,
+    'images/recycling.png': 0.2125,
+    'images/e_car.png': 2.21,
+}
+
 
 # normalize real impact scores
 

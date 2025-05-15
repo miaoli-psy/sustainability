@@ -4,70 +4,63 @@ import pandas as pd
 from src.common.process import insert_new_col_from_two_cols, insert_new_col, get_resp, \
     get_correct_ans, get_correct_wrong_index
 
-# read data
-PATH_DATA = "../../data/ie_data/"
-dir_list = os.listdir(PATH_DATA)
-# all data files
-dir_list = [f for f in os.listdir(PATH_DATA) if f.lower().endswith('.csv')]
+script_dir = os.path.dirname(os.path.abspath(__file__))
+os.chdir(script_dir)
 
-df_list_all = [pd.read_csv(PATH_DATA + file) for file in dir_list]
-
-# get implicit task data
-
-col_implicit = ["participant", "expName", "imageA", "imageB", "key_resp_im.keys", "random_n",
-                "key_resp_im.rt", "trials.thisRepN", "trials.thisTrialN"]
-
-df_implicit_list = list()
-for data in df_list_all:
-    # get implicit task relevant cols
-    data_implicit = data[col_implicit]
-    # clean up the rows
-    data_implicit = data_implicit.dropna(subset=["trials.thisTrialN"])
-    df_implicit_list.append(data_implicit)
-
-data_implicit = pd.concat(df_implicit_list)
-
-
-# get participants resp
-insert_new_col_from_two_cols(data_implicit, "key_resp_im.keys", "random_n", "resp", get_resp)
-
-# add impact of each actions
-actions1 = data_implicit["imageA"].unique().tolist()
-actions2 = data_implicit["imageB"].unique().tolist()
-actions = list(set(actions1 + actions2))
+# mapping action impacts
 
 impact_mapping = {
-    actions[0]: 0.247,
-    actions[1]: 0.21,
-    actions[2]: 117.7,
-    actions[3]: 1.6,
-    actions[4]: 0.17,
-    actions[5]: 1.4,
-    actions[6]: 1.6,
-    actions[7]: 3.08,
-    actions[8]: 0.2125,
-    actions[9]: 2.21,
+    'images/laundry.png': 0.247,
+    'images/hang_dry.png': 0.21,
+    'images/child.png': 117.7,
+    'images/plant_based.png': 0.91,
+    'images/light_bulb.png': 0.17,
+    'images/green_energy.png': 1.4,
+    'images/flight.png': 1.6,
+    'images/car.png': 3.08,
+    'images/recycling.png': 0.2125,
+    'images/e_car.png': 2.21,
 }
-
 
 def get_impact_value(action):
     return impact_mapping.get(action)
 
+def process_raw(raw_data_path, task_order):
 
-insert_new_col(data_implicit, "imageA", "impactA", get_impact_value)
-insert_new_col(data_implicit, "imageB", "impactB", get_impact_value)
+    dir_list = [f for f in os.listdir(raw_data_path) if f.lower().endswith('.csv')]
+    df_list_all = [pd.read_csv(raw_data_path + file) for file in dir_list]
 
-# add correct answer
+    # get implicit task data
+    col_implicit = ["participant", "ProlificID", "expName", "imageA", "imageB", "key_resp_im.keys", "random_n",
+                    "key_resp_im.rt", "trials.thisRepN", "trials.thisTrialN"]
 
-insert_new_col_from_two_cols(data_implicit, "impactA", "impactB", "correctAns", get_correct_ans)
+    data_all = pd.concat([
+        df[col_implicit].dropna(subset=["trials.thisTrialN"]) for df in df_list_all])
 
 
-# add correct/wrong index
+    insert_new_col_from_two_cols(data_all, "key_resp_im.keys", "random_n", "resp", get_resp)
+    insert_new_col(data_all, "imageA", "impactA", lambda x: impact_mapping.get(x))
+    insert_new_col(data_all, "imageB", "impactB", lambda x: impact_mapping.get(x))
+    insert_new_col_from_two_cols(data_all, "impactA", "impactB", "correctAns", get_correct_ans)
+    insert_new_col_from_two_cols(data_all, "correctAns", "resp", "if_resp_correct", get_correct_wrong_index)
+    data_all["task_order"] = task_order
+
+    return data_all
 
 
-insert_new_col_from_two_cols(data_implicit, "correctAns", "resp", "if_resp_correct",
-                             get_correct_wrong_index)
+
+# read data
+PATH_DATA_ie = "../../data/ie_data/"
+PATH_DATA_ei = "../../data/ei_data/"
+
+data_ie = process_raw(PATH_DATA_ie, 'ie')
+data_ei = process_raw(PATH_DATA_ie, 'ei')
+
+data_combined = pd.concat([data_ie, data_ei], ignore_index=True)
+
+data_combined_no_child = data_combined[(data_combined["imageA"] != "images/child.png") & (data_combined["imageB"] != "images/child.png")]
 # write to excel
-write_to_excel = False
-if write_to_excel:
-    data_implicit.to_excel("ie_implicitdata.xlsx", index = False)
+write_to_csv = False
+if write_to_csv:
+    data_combined.to_csv("implicitdata.csv", index = False)
+    data_combined_no_child.to_csv("implicitdata_nochild.csv", index = False)
