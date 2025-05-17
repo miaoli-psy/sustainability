@@ -1,16 +1,15 @@
-library(readxl)
 library(dplyr)
-
 library(ggplot2)
-
 library(BradleyTerry2)
+
 
 setwd("D:/OneDrive/projects/sustainability/src/analysis/")
 
-data <- readxl::read_excel(file.choose()) #ie_implicitdata.xlsx
+# =====================Impliicit task========================================
+data_im <- readr::read_csv(file.choose()) #implicitdata_nochild.csv or implicitdata.csv
 
 # extract action names from image paths
-data <- data %>%
+data_im <- data_im %>%
   mutate(
     actionA = gsub(".png", "", basename(imageA)),
     actionB = gsub(".png", "", basename(imageB))
@@ -18,7 +17,7 @@ data <- data %>%
 #---------calculate percent correct (non-weighted)--------------
 
 # list actions
-actions <- unique(data$actionA)
+actions <- unique(data_im$actionA)
 
 # the one not in actionA
 action_not_inA <- "recycling"
@@ -26,7 +25,7 @@ action_not_inA <- "recycling"
 # iterate actionA, calcualte each percent correct for the action - then combine
 # the df
 actionA_im_non_weight_by_subject <- purrr::map_dfr(actions, function(action) {
-  data %>%
+  data_im %>%
     filter(actionA == action) %>%
     group_by(actionA, participant) %>%
     summarise(
@@ -37,7 +36,7 @@ actionA_im_non_weight_by_subject <- purrr::map_dfr(actions, function(action) {
 })
 
 # percent correct for the other action - now, in col actionB
-data_filter <- data %>% 
+data_filter <- data_im %>% 
   filter(actionB == action_not_inA)
 
 actionB_by_subject  <- data_filter %>% 
@@ -142,7 +141,7 @@ plot_percent_correct
 #---------Bradley-Terry model, for all data set, effect of the trial/task difficulty------
 
 # add col chosen
-data <- data %>% 
+data_im <- data_im %>% 
   mutate(
     chosen = ifelse(resp == "A", actionA, actionB)
   )
@@ -151,19 +150,19 @@ data <- data %>%
 # negative, very difficult (real impact scores between A and B are close)
 # positive, low difficulty (real impact scores between A and B differ)
 
-data <- data %>% 
+data_im <- data_im %>% 
   mutate(
     difficulty = log(abs(impactA - impactB) + 1e-6) # avoid -inf
   )
 
 
 # get col names for BTm
-data <- data %>% 
+data_im <- data_im %>% 
   rename(item1 = actionA,
          item2 = actionB)
 
 
-bt_data <- data %>% 
+bt_data <- data_im %>% 
   group_by(participant, item1, item2) %>% 
   summarise(
     wins1 = sum(chosen == item1),
@@ -263,30 +262,142 @@ bt_model <- BTm(
 
 summary(bt_model)
 
-# Extract item ability estimates
-coefs <- coef(bt_model)
+abilities <- BTabilities(bt_model) # Ranks are based on estimated log-odds, the actual output of the model.
 
-# coefficients and convert to odds
-odds <- exp(coef(bt_model))
-odds
+bt_ability_df <- as.data.frame(abilities)
 
-# to probabilities
-probabilities <- odds / (1 + odds)
-probabilities
+bt_ability_df <- bt_ability_df %>%
+  mutate(
+    action = rownames(.),
+    rank_bt_ability = rank(-ability),  # higher ability → rank 1
+    implicit_score = (ability - min(ability)) / (max(ability) - min(ability))
+  )
 
-scores <- probabilities * 100
-scores['car'] <- 50
+bt_ability_df
 
-scores
-
-# rank scores, higher to lower 10 to 1 (if reverse, use -scores)
-# Using a Bradley-Terry model, we derived a rank order of actions based on the 
-# frequency with which each was chosen as more impactful. 
-# This reflects participants' implicit beliefs about climate action efficacy. 
-# The results show a divergence from actual impact rankings, 
-# suggesting systematic over- and underestimation of certain behaviors
-bt_ranks <- rank(scores) 
-bt_ranks
+# # compare BT implict_socre with percentcorrect
+# merged_implicit <- inner_join(data_to_plot_across_subject, bt_ability_df, by = "action")
+# 
+# # corr: BT ranking (implict score) and percent correct
+# cor_test <- cor.test(merged_implicit$mean_percent_correct, merged_implicit$implicit_score, method = "spearman")
+# cor_test
 
 
+#  ----real impact values-----
+
+# real_impact <- c(
+#   laundry = 0.247,
+#   hang_dry = 0.21,
+#   child = 117.7,
+#   plant_based = 0.91,
+#   light_bulb = 0.17,
+#   green_energy = 1.4,
+#   flight = 1.6,
+#   car = 3.08,
+#   recycling = 0.2125,
+#   e_car = 2.21
+# )
+
+real_impact <- c(
+  laundry = 0.247,
+  hang_dry = 0.21,
+  plant_based = 0.91,
+  light_bulb = 0.17,
+  green_energy = 1.4,
+  flight = 1.6,
+  car = 3.08,
+  recycling = 0.2125,
+  e_car = 2.21
+)
+
+# Normalize real impact to 0–1
+real_impact_df <- tibble(
+  action = names(real_impact),
+  real_impact = as.numeric(real_impact),
+  real_impact_norm = real_impact  / max(real_impact)
+)
+
+
+merged_implicit_real <- inner_join(real_impact_df, bt_ability_df, by = "action")
+
+
+# corr: BT ranking (implict score) and real impact
+cor_test <- cor.test(merged_implicit_real$implicit_score, merged_implicit_real$real_impact_norm, method = "spearman")
+cor_test
+
+plot_corr_BTrangking_realimpact <- ggplot() +
+  
+  # Points with swapped axes
+  geom_point(data = merged_implicit_real,
+             aes(
+               x = implicit_score,
+               y = real_impact_norm,
+               color = action,
+               size = 0.4
+             ),
+             alpha = 0.5,
+             show.legend = FALSE) +
+  
+  # Regression fit with swapped axes
+  # geom_smooth(data = merged_implicit_real,
+  #             aes(
+  #               x = implicit_score,
+  #               y = real_impact_norm
+  #             ),
+  #             method = 'lm',
+  #             se = FALSE,
+  #             color = "blue",
+  #             linetype = 'dashed'
+  # ) +
+  
+  # Text labels with swapped axes
+  geom_text(data = merged_implicit_real,
+            aes(
+              x = implicit_score,
+              y = real_impact_norm,
+              label = action),
+            nudge_x = 0,
+            size = 4) +
+  
+  annotate("text", x = 0.1, 
+           y = 0.95, 
+           label = paste0("Spearman ρ = ", round(cor_test$estimate, 2)), 
+           size = 5, 
+           fontface = "bold") +
+  
+  # Identity line (diagonal from 0,0 to 1,1)
+  geom_abline(intercept = 0, slope = 1, linetype = "dotted", color = "black") +
+  
+  scale_x_continuous(limits = c(0, 1.0)) +
+  scale_y_continuous(limits = c(0, 1.0)) +
+  
+  labs(x = "Normalized Implicit Ability (BT model)",
+       y = "Normalized Real Impact",
+       title = "Implict Task") +
+  
+  theme(
+    axis.title.x = element_text(
+      color = "black",
+      size = 14,
+      face = "bold"
+    ),
+    axis.title.y = element_text(
+      color = "black",
+      size = 14,
+      face = "bold"
+    ),
+    panel.border = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(colour = "grey"),
+    axis.text.x = element_text(angle = 0, hjust = 1, size = 12, face = "bold"),
+    axis.text.y = element_text(size = 12, face = "bold"),
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.text = element_text(size = 10),
+    strip.text.x = element_text(size = 12, face = "bold"),
+    panel.spacing = unit(1.0, "lines")
+  )
+
+plot_corr_BTrangking_realimpact
 
