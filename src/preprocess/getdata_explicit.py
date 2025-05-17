@@ -61,15 +61,27 @@ def process_explicit_data(path_data, task_order, real_impact_dict, include_child
                 continue
 
             actions_filtered, responses_filtered, rts_filtered = zip(*full_data)
-            max_response = max(responses_filtered)
-            normalized_measured = [resp / max_response for resp in responses_filtered]
 
-            real_impacts = [real_impact_dict.get(a) for a in actions_filtered]
-            normalized_real_impacts = [normalized_real_impact_dict.get(a) for a in actions_filtered]
+            # Clean action names: 'images/car.png' → 'car'
+            actions_clean = [a.replace("images/", "").replace(".png", "") for a in actions_filtered]
+
+            # ✅ Normalize responses to [0, 1] per participant using min-max
+            min_response = min(responses_filtered)
+            max_response = max(responses_filtered)
+            response_range = max_response - min_response if max_response > min_response else 1e-6  # prevent div by 0
+            normalized_measured = [(resp - min_response) / response_range for resp in
+                                   responses_filtered]
+
+            # Match real impact values using original image names
+            real_impacts = [real_impact_dict.get("images/" + a + ".png") for a in actions_clean]
+            normalized_real_impacts = [normalized_real_impact_dict.get("images/" + a + ".png") for a
+                                       in actions_clean]
             weighted_scores = [m - r for m, r in zip(normalized_measured, normalized_real_impacts)]
 
-            measured_ranks = pd.Series(normalized_measured).rank(ascending=False, method='min').tolist()
-            real_ranks = pd.Series(normalized_real_impacts).rank(ascending=False, method='min').tolist()
+            measured_ranks = pd.Series(normalized_measured).rank(ascending=False,
+                                                                 method='min').tolist()
+            real_ranks = pd.Series(normalized_real_impacts).rank(ascending=False,
+                                                                 method='min').tolist()
             deviations = [(m - r) for m, r in zip(normalized_measured, normalized_real_impacts)]
 
             row_data = pd.DataFrame({
@@ -98,7 +110,7 @@ def process_explicit_data(path_data, task_order, real_impact_dict, include_child
 PATH_DATA_ie = "../../data/ie_data/"
 PATH_DATA_ei = "../../data/ei_data/"
 
-include_child = True #TODO
+include_child = False #TODO
 
 data_ie = process_explicit_data(PATH_DATA_ie, "ie", real_impact_dict, include_child=include_child)
 data_ei = process_explicit_data(PATH_DATA_ei, "ei", real_impact_dict, include_child=include_child)
