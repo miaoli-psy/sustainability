@@ -45,6 +45,10 @@ def process_raw(raw_data_path, task_order):
     insert_new_col_from_two_cols(data_all, "correctAns", "resp", "if_resp_correct", get_correct_wrong_index)
     data_all["task_order"] = task_order
 
+    # update col participant, remove col ProlificID
+    data_all["participant"] = data_all["participant"].astype(str) + "_" + data_all["ProlificID"].astype(str)
+    data_all.drop(columns=["ProlificID"], inplace=True)
+
     return data_all
 
 
@@ -54,7 +58,7 @@ PATH_DATA_ie = "../../data/ie_data/"
 PATH_DATA_ei = "../../data/ei_data/"
 
 data_ie = process_raw(PATH_DATA_ie, 'ie')
-data_ei = process_raw(PATH_DATA_ie, 'ei')
+data_ei = process_raw(PATH_DATA_ei, 'ei')
 
 data_combined = pd.concat([data_ie, data_ei], ignore_index=True)
 
