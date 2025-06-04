@@ -23,6 +23,8 @@ def process_explicit_data(path_data, task_order, real_impact_dict, include_child
     dir_list = [f for f in os.listdir(path_data) if f.lower().endswith('.csv')]
     df_list_all = [pd.read_csv(os.path.join(path_data, file)) for file in dir_list]
 
+    print(f"length csv is {len(df_list_all)}")
+
     # get the cols
     slider_responses = [f'slider_posi_{i}.response' for i in range(1, 11)]
     slider_times = [f'slider_posi_{i}.rt' for i in range(1, 11)]
@@ -118,7 +120,7 @@ data_ei = process_explicit_data(PATH_DATA_ei, "ei", real_impact_dict, include_ch
 data_combined = pd.concat([data_ie, data_ei], ignore_index=True)
 
 # write to excel
-write_to_csv = True
+write_to_csv = False
 if write_to_csv:
     if include_child:
         data_combined.to_csv("explicitdata.csv", index = False)

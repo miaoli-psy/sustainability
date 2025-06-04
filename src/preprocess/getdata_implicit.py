@@ -30,6 +30,8 @@ def process_raw(raw_data_path, task_order):
     dir_list = [f for f in os.listdir(raw_data_path) if f.lower().endswith('.csv')]
     df_list_all = [pd.read_csv(raw_data_path + file) for file in dir_list]
 
+    print(f"length csv is {len(df_list_all)}")
+
     # get implicit task data
     col_implicit = ["participant", "ProlificID", "expName", "imageA", "imageB", "key_resp_im.keys", "random_n",
                     "key_resp_im.rt", "trials.thisRepN", "trials.thisTrialN"]
