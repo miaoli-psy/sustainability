@@ -121,5 +121,5 @@ if __name__ == "__main__":
                     return x # leave the original value if it cannot be interpreted
             df_all[col] = df_all[col].apply(map_value)
 
-    df_all.to_csv("datalq.csv", index=False)
+    df_all.to_csv("data_demographic_lq.csv", index=False)
 
